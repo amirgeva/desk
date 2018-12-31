@@ -65,6 +65,7 @@ class Manager:
                 continue
             event = self.display.next_event()
             if event.type == X.MapNotify or event.type == X.UnmapNotify:
+                self.hold()
                 self.arrange()
                 self.update_clients()
 
@@ -80,6 +81,10 @@ class Manager:
             msg = self.build()
             for sock in self.clients.keys():
                 self.clients.get(sock).write(msg)
+
+    def hold(self):
+        for sock in self.clients.keys():
+            self.clients.get(sock).write('HOLD')
 
     def handle(self, cmd):
         print("Handling '{}'".format(cmd))
@@ -124,7 +129,7 @@ def server():
             c = mgr.clients.get(sock)
             if len(c.queue) > 0:
                 writers.append(sock)
-        rd, wr, xl = select(readers, writers, [], 0.1)
+        rd, wr, xl = select(readers, writers, [], 0.01)
         for sock in rd:
             if sock == srv:
                 (sock, address) = sock.accept()
