@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from twisted.internet.protocol import Protocol
 from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 import re
@@ -12,6 +12,39 @@ class RFB(Protocol):
         self.expected_len=0
         self.expect(self.handle_version,12)
         self.rectangles_left=0
+        self.keycodes={
+            'escape':0xff1b,
+            'backspace':0xff08,
+            'insert':0xff63,
+            'home':0xff50,
+            'page_up':0xff55,
+            'page_down':0xff56,
+            'tab':0xff09,
+            'delete':0xffff,
+            'end':0xff57,
+            'enter':0xff0d,
+            'arrow_left':0xff51,
+            'arrow_up':0xff52,
+            'arrow_down':0xff54,
+            'arrow_right':0xff53,
+            'lshift':0xffe1,
+            'rshift':0xffe2,
+            'lcontrol':0xffe3,
+            'rcontrol':0xffe4,
+            'lalt':0xffe9,
+            'ralt':0xffea
+        }
+        for i in range(12):
+            self.keycodes['f{}'.format(i+1)]=0xffbe+i
+
+    def handle_key_event(self,event):
+        key=event[0]
+        down=event[1]
+        if len(key)==1:
+            self.send_key(ord(key),down)
+        else:
+            if key in self.keycodes:
+                self.send_key(self.keycodes.get(key),down)
 
     def nop(self,block):
         pass
@@ -51,10 +84,19 @@ class RFB(Protocol):
         self.request_update(True)
 
     def request_update(self,full):
-        incr=0
+        incr=1
         if full:
-            incr=1
+            incr=0
         self.transport.write(pack('!BBHHHH',3,incr,0,0,self.width,self.height))
+
+    def send_key(self,keycode,down):
+        flag=0
+        if down:
+            flag=1
+        self.transport.write(pack('!BBHI',4,flag,0,keycode))
+
+    def send_mouse_event(self,buttons,x,y):
+        self.transport.write(pack('!BBHH',5,buttons,x,y))
 
     def expect(self,handler,block_len):
         if len(self.buffer)>=block_len:
@@ -104,13 +146,14 @@ class RFB(Protocol):
 
     def handle_rectangle(self,block):
         x,y,w,h,e = unpack('!HHHHI',block)
+        print("Handle {},{},{},{}".format(x,y,w,h))
         self.cur_rect = (x,y,w,h)
         if e==0:
             self.expect(self.handle_raw,w*h*4)
         elif e==1:
             self.expect(self.handle_copy_rect,4)
-        #if self.rectangles_left == 0:
-        #    self.request_update(False)
+        if self.rectangles_left == 0:
+            self.request_update(False)
 
     def handle_raw(self,block):
         #print("Received block size: {}, for rect: {},{},{},{}".format(len(block),*self.cur_rect))
@@ -132,6 +175,10 @@ def run(client):
     ep = TCP4ClientEndpoint(reactor, "localhost", 5900+d)
     d = connectProtocol(ep, client)
     tasks = client.get_tasks()
-    for task in tasks:
-        reactor.callLater(0.1,task)
+    for t in tasks:
+        l = task.LoopingCall(t)
+        l.start(0.01)
     reactor.run()
+
+def stop():
+    reactor.stop()
