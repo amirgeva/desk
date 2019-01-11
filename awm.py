@@ -31,6 +31,7 @@ class Manager:
 
     def focus(self,id):
         if id in self.window_objs:
+            print("Raising {}".format(id))
             w=self.window_objs.get(id)
             w.circulate(X.RaiseLowest)
 
