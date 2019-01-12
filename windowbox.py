@@ -13,6 +13,9 @@ class WindowBox:
         self.update_vertices((0,0,500,300),(1000,1000))
         self.node = self.makeBox(front_texture, back_texture)
 
+    def close(self):
+        self.node.removeNode()
+
     def update_vertices(self,rect,desktop):
         self.vertex = GeomVertexWriter(self.vdata, 'vertex')
         self.texcoord = GeomVertexWriter(self.vdata, 'texcoord')

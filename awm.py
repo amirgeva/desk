@@ -8,46 +8,49 @@ from Xlib.display import Display
 from Xlib import X, XK
 from rectpack import newPacker
 
+
 class Manager:
     def __init__(self, display, client):
         self.display = Display(':{}'.format(display))
         self.root = self.display.screen().root
         self.root.change_attributes(event_mask=X.SubstructureNotifyMask)
-        self.window_rects = {}
-        self.window_objs = {}
+        self.window_rectangles = {}
+        self.window_objects = {}
         self.client = client
         self.refresh()
 
     def refresh(self):
-        self.window_rects = {}
-        self.window_objs = {}
+        self.window_rectangles = {}
+        self.window_objects = {}
         windows = self.root.query_tree().children
         if len(windows) > 0:
             for w in windows:
-                g = w.get_geometry()
-                self.window_rects[w.id] = (g.x, g.y, g.width, g.height)
-                self.window_objs[w.id] = w
-            self.client.update_windows(self.window_rects)
+                if w.get_attributes().map_state==2:
+                    g = w.get_geometry()
+                    self.window_rectangles[w.id] = (g.x, g.y, g.width, g.height)
+                    self.window_objects[w.id] = w
+            self.client.update_windows(self.window_rectangles)
 
-    def focus(self,id):
-        if id in self.window_objs:
+    def focus(self, id):
+        if id in self.window_objects:
             print("Raising {}".format(id))
-            w=self.window_objs.get(id)
+            w = self.window_objects.get(id)
             w.circulate(X.RaiseLowest)
 
     def arrange(self):
         packer = newPacker(rotation=False)
         windows = self.root.query_tree().children
-        self.window_rects = {}
-        self.window_objs = {}
+        self.window_rectangles = {}
+        self.window_objects = {}
         if len(windows) > 0:
             for w in windows:
-                self.window_objs[w.id]=w
-                g = w.get_geometry()
-                width = g.width
-                height = g.height
-                print("Adding window size: {}x{}".format(width, height))
-                packer.add_rect(g.width, g.height)
+                if w.get_attributes().map_state == 2:
+                    self.window_objects[w.id] = w
+                    g = w.get_geometry()
+                    width = g.width
+                    height = g.height
+                    print("Adding window size: {}x{}".format(width, height))
+                    packer.add_rect(g.width, g.height)
             g = self.root.get_geometry()
             packer.add_bin(g.width, g.height)
             packer.pack()
@@ -57,7 +60,7 @@ class Manager:
                 r = bag[i]
                 win = windows[i]
                 win.configure(x=r.x, y=r.y, width=r.width, height=r.height)
-                self.window_rects[win.id] = (r.x, r.y, r.width, r.height)
+                self.window_rectangles[win.id] = (r.x, r.y, r.width, r.height)
 
     def handle_events(self):
         n = self.display.pending_events()
@@ -66,5 +69,4 @@ class Manager:
             if event.type == X.MapNotify or event.type == X.UnmapNotify:
                 self.client.hold()
                 self.arrange()
-                self.client.update_windows(self.window_rects)
-
+                self.client.update_windows(self.window_rectangles)

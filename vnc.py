@@ -15,11 +15,6 @@ class RFB(Protocol):
         self.rectangles_left = 0
         self.mouse_buttons = 0
         self.mouse=(0,0)
-        self.buttonnames = {
-            'mouse1': 1,
-            'mouse2': 2,
-            'mouse3': 3
-        }
         self.keycodes = {
             'escape': 0xff1b,
             'backspace': 0xff08,
@@ -54,20 +49,19 @@ class RFB(Protocol):
         else:
             if key in self.keycodes:
                 self.send_key(self.keycodes.get(key), down)
-            elif key in self.buttonnames:
-                button_index = self.buttonnames.get(key)
-                mask = (1 << (button_index - 1))
-                if down:
-                    self.mouse_buttons = self.mouse_buttons | mask
-                else:
-                    self.mouse_buttons = self.mouse_buttons & ~mask
-                self.send_mouse_event(self.mouse_buttons,self.mouse)
             else:
                 print("Unknown event '{}'".format(key))
 
-    def handle_mouse_event(self,pos):
+    def handle_mouse_button_event(self,button,down):
+        mask = (1 << (button - 1))
+        if down:
+            self.mouse_buttons = self.mouse_buttons | mask
+        else:
+            self.mouse_buttons = self.mouse_buttons & ~mask
+        self.send_mouse_event(self.mouse_buttons, self.mouse)
+
+    def handle_mouse_move_event(self,pos):
         if self.mouse[0]!=pos[0] or self.mouse[1]!=pos[1]:
-            #print("mouse: {},{}".format(pos[0],pos[1]))
             self.mouse=(pos[0],pos[1])
             self.send_mouse_event(self.mouse_buttons,self.mouse)
 
