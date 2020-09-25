@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import sys
-import threading
-import time
-import socket
-from select import select
+# import sys
+# import threading
+# import time
+# import socket
+# from select import select
 from Xlib.display import Display
-from Xlib import X, XK
+from Xlib import X
 from rectpack import newPacker
 
 
@@ -24,17 +24,20 @@ class Manager:
         self.window_objects = {}
         windows = self.root.query_tree().children
         if len(windows) > 0:
+            print(f'Checking {len(windows)} windows: ')
             for w in windows:
-                if w.get_attributes().map_state==2:
+                if w.get_attributes().map_state == 2:
                     g = w.get_geometry()
+                    print(f'Window {w.id}: {g.width}x{g.height}')
                     self.window_rectangles[w.id] = (g.x, g.y, g.width, g.height)
                     self.window_objects[w.id] = w
+            print('------------------------')
             self.client.update_windows(self.window_rectangles)
 
-    def focus(self, id):
-        if id in self.window_objects:
-            print("Raising {}".format(id))
-            w = self.window_objects.get(id)
+    def focus(self, window_id):
+        if window_id in self.window_objects:
+            print("Raising {}".format(window_id))
+            w = self.window_objects.get(window_id)
             w.circulate(X.RaiseLowest)
 
     def arrange(self):
@@ -45,7 +48,7 @@ class Manager:
         if len(windows) > 0:
             for w in windows:
                 if w.get_attributes().map_state == 2:
-                    self.window_objects[w.id] = w
+                    self.window_objects[w.window_id] = w
                     g = w.get_geometry()
                     width = g.width
                     height = g.height
@@ -60,7 +63,7 @@ class Manager:
                 r = bag[i]
                 win = windows[i]
                 win.configure(x=r.x, y=r.y, width=r.width, height=r.height)
-                self.window_rectangles[win.id] = (r.x, r.y, r.width, r.height)
+                self.window_rectangles[win.window_id] = (r.x, r.y, r.width, r.height)
 
     def handle_events(self):
         n = self.display.pending_events()

@@ -1,125 +1,14 @@
 #!/usr/bin/env python3
-from math import pi, sin, cos, copysign
+from math import copysign
+import sys
 import vnc
 import awm
+import globals
 from direct.showbase.ShowBase import ShowBase
-from direct.task import Task
 from panda3d.core import *
-from windowbox import WindowBox
-
-# from twisted.internet import reactor
-# from direct.task import Task
-
-
-desk_rect = (1000, 1000)
-front_texture = None
-back_texture = None
-
-
-def norm_rot(x):
-    x = copysign(1, x) * (x ** 2)
-    return x
-
-
-class Window3D:
-    def __init__(self, id, rect):
-        print("Creating window ID={}".format(id))
-        self.rect = rect
-        self.id = id
-        self.box = WindowBox(front_texture, back_texture)
-        self.box.update_vertices(rect, desk_rect)
-        self.box.node.setPos(0, 1000, 200)
-        self.box.node.setTag('wid', str(id))
-
-    def rotate(self, dx, dy):
-        dx = norm_rot(dx)
-        dy = norm_rot(dy)
-        v = self.box.node.getHpr()
-        v = v + LVecBase3(dx, dy, 0)
-        self.box.node.setHpr(v)
-
-    def move(self, dx, dy, lateral):
-        print("Move by {},{}".format(dx, dy))
-        # dx=norm_rot(dx)
-        # dy=norm_rot(dy)
-        v = self.box.node.getPos()
-        if lateral:
-            v = v + LVecBase3(dx, 0, -dy)
-        else:
-            v = v + LVecBase3(dx, dy, 0)
-        self.box.node.setPos(v)
-
-    def close(self):
-        self.box.close()
-
-    def calc_desktop_coords(self, v):
-        if v[2] > 0:
-            return None
-        x = int(self.rect[0] + (0.5 * self.rect[2] + v[0]))
-        y = int(self.rect[1] - v[2])
-        return (x, y)
-
-
-class Picker:  # (DirectObject.DirectObject):
-    def __init__(self):
-        self.picker = CollisionTraverser()
-        self.queue = CollisionHandlerQueue()
-        self.pickerNode = CollisionNode('mouseRay')
-        self.pickerNP = camera.attachNewNode(self.pickerNode)
-        self.pickerNode.setFromCollideMask(GeomNode.getDefaultCollideMask())
-        self.pickerRay = CollisionRay()
-        self.pickerNode.addSolid(self.pickerRay)
-        self.pickerNP = camera.attachNewNode(self.pickerNode)
-        self.picker.addCollider(self.pickerNP, self.queue)
-
-    def pick(self, mpos, camNode):
-        self.pickerRay.setFromLens(camNode, mpos.getX(), mpos.getY())
-        self.picker.traverse(render)
-        if self.queue.getNumEntries() > 0:
-            self.queue.sortEntries()
-            entry = self.queue.getEntry(0)
-            o = entry.getIntoNodePath()
-            v = entry.getSurfacePoint(o)
-            while o != render:
-                s = o.getTag('wid')
-                if s:
-                    return (int(s), v)
-                else:
-                    o = o.getParent()
-        return (None, None)
-
-
-class GUIBase(ShowBase):
-    def __init__(self):
-        ShowBase.__init__(self)
-        global front_texture, back_texture
-        back_texture = loader.loadTexture('wood.jpg')
-        self.buttonThrowers[0].node().setButtonDownEvent('keydown')
-        self.buttonThrowers[0].node().setButtonUpEvent('keyup')
-        self.buttonThrowers[0].node().setKeystrokeEvent('keystroke')
-        self.disableMouse()
-        self.picker = Picker()
-        # if not self.mouseWatcherNode.hasMouse():
-        #    raise RuntimeError('No mouse')
-
-    def userExit(self):
-        vnc.stop()
-
-    def mouse_mode(self, relative):
-        props = WindowProperties()
-        props.setCursorHidden(relative)
-        # if relative:
-        #    props.setMouseMode(WindowProperties.M_relative)
-        # else:
-        #    props.setMouseMode(WindowProperties.M_absolute)
-        self.win.requestProperties(props)
-
-    def doPicking(self):
-        if self.mouseWatcherNode.hasMouse():
-            mpos = self.mouseWatcherNode.getMouse()
-            return self.picker.pick(mpos, self.camNode)
-        return (None, None)
-
+# from windowbox import WindowBox
+from window3d import Window3D
+from gui_tools import GUIBase
 
 gui = GUIBase()
 
@@ -133,13 +22,14 @@ class Client(vnc.RFB):
         self.rotating = None
         self.moving = None
         self.lateral = True
+        self.ignore_next_wheel_up = False
         self.hold_mouse = (0, 0)
         self.mouse_pos = (0, 0)
         self.windows = {}
         self.wm = awm.Manager(self.get_display(), self)
-        gui.accept('keydown', self.keydown)
-        gui.accept('keyup', self.keyup)
-        gui.accept('keystroke', self.keychar)
+        gui.accept('keydown', self.key_down)
+        gui.accept('keyup', self.key_up)
+        gui.accept('keystroke', self.key_char)
 
     def on_mouse_button(self, button, down):
         if self.hover > 0 and down:
@@ -168,41 +58,49 @@ class Client(vnc.RFB):
     def on_mouse_move(self, win, pos):
         self.handle_mouse_move_event(pos)
 
-    def keydown(self, key):
+    def key_down(self, key):
         if len(key) > 1:
             if key.startswith('mouse'):
                 self.on_mouse_button(int(key[5:]), True)
+            elif key.startswith('control-wheel'):
+                self.handle_control_wheel(key[13:] == '_down')
+                self.ignore_next_wheel_up = True
             else:
                 self.handle_key_event((key, True))
 
-    def keyup(self, key):
+    def key_up(self, key):
         if len(key) > 1:
             if key.startswith('mouse'):
                 self.on_mouse_button(int(key[5:]), False)
+            elif key.startswith('wheel') and self.ignore_next_wheel_up:
+                self.ignore_next_wheel_up = False
             else:
                 self.handle_key_event((key, False))
 
-    def keychar(self, key):
+    def key_char(self, key):
         if ord(key) > 32:
             self.handle_key_event((key, True))
             self.handle_key_event((key, False))
+
+    def handle_control_wheel(self, down):
+        print(f'Wheel move {down}')
 
     def hold(self):
         pass
 
     def remove_old_windows(self, wins):
         existing = list(self.windows.keys())
-        for id in existing:
-            if id not in wins:
-                self.windows[id].close()
-                del self.windows[id]
+        for window_id in existing:
+            if window_id not in wins:
+                self.windows[window_id].close()
+                del self.windows[window_id]
 
     def update_windows(self, wins):
         self.remove_old_windows(wins)
-        if front_texture:
-            for id in wins.keys():
-                if id not in self.windows:
-                    self.windows[id] = Window3D(id, wins.get(id))
+        if globals.front_texture:
+            for window_id in wins.keys():
+                if window_id not in self.windows:
+                    self.windows[window_id] = Window3D(window_id, wins.get(window_id))
 
     def get_display(self):
         return 2
@@ -223,7 +121,7 @@ class Client(vnc.RFB):
             self.hold_mouse = (x, y)
         else:
             self.hover_caption = None
-            (w, v) = gui.doPicking()
+            (w, v) = gui.do_picking()
             if w:
                 win = self.windows.get(int(w))
                 if win:
@@ -240,7 +138,7 @@ class Client(vnc.RFB):
         self.poll_mouse()
 
     def copy_rect(self, src_point, dst_rect):
-        buffer = front_texture.modifyRamImage()
+        buffer = globals.front_texture.modifyRamImage()
         h = dst_rect[3]
         w = dst_rect[2]
         src_index = src_point[1] * self.stride + src_point[0] * 4
@@ -253,15 +151,15 @@ class Client(vnc.RFB):
 
     def update_pixels(self, rect, pixels):
         pixels = bytes(pixels)
-        global front_texture
-        global desk_rect
-        if not front_texture:
-            desk_rect = (rect[2], rect[3])
-            front_texture = Texture("screen")
-            front_texture.setup2dTexture(rect[2], rect[3], Texture.TUnsignedByte, Texture.FRgba8)
+        if not globals.front_texture:
+            globals.desk_rect = (rect[2], rect[3])
+            sys.stdout.write("Loading front texture: ")
+            globals.front_texture = Texture("screen")
+            globals.front_texture.setup2dTexture(rect[2], rect[3], Texture.TUnsignedByte, Texture.FRgba8)
+            print(globals.front_texture)
             self.stride = rect[2] * 4
             self.wm.refresh()
-        buffer = front_texture.modifyRamImage()
+        buffer = globals.front_texture.modifyRamImage()
         src_stride = rect[2] * 4
         src = 0
         for i in range(rect[3]):
