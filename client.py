@@ -15,8 +15,9 @@ desk_rect = (1000, 1000)
 front_texture = None
 back_texture = None
 
+
 def norm_rot(x):
-    x=copysign(1,x) * (x**2)
+    x = copysign(1, x) * (x ** 2)
     return x
 
 
@@ -30,20 +31,20 @@ class Window3D:
         self.box.node.setPos(0, 1000, 200)
         self.box.node.setTag('wid', str(id))
 
-    def rotate(self,dx,dy):
-        dx=norm_rot(dx)
-        dy=norm_rot(dy)
-        v=self.box.node.getHpr()
-        v=v+LVecBase3(dx,dy,0)
+    def rotate(self, dx, dy):
+        dx = norm_rot(dx)
+        dy = norm_rot(dy)
+        v = self.box.node.getHpr()
+        v = v + LVecBase3(dx, dy, 0)
         self.box.node.setHpr(v)
 
-    def move(self,dx,dy,lateral):
-        print("Move by {},{}".format(dx,dy))
-        #dx=norm_rot(dx)
-        #dy=norm_rot(dy)
-        v=self.box.node.getPos()
+    def move(self, dx, dy, lateral):
+        print("Move by {},{}".format(dx, dy))
+        # dx=norm_rot(dx)
+        # dy=norm_rot(dy)
+        v = self.box.node.getPos()
         if lateral:
-            v=v+LVecBase3(dx,0,-dy)
+            v = v + LVecBase3(dx, 0, -dy)
         else:
             v = v + LVecBase3(dx, dy, 0)
         self.box.node.setPos(v)
@@ -98,18 +99,18 @@ class GUIBase(ShowBase):
         self.buttonThrowers[0].node().setKeystrokeEvent('keystroke')
         self.disableMouse()
         self.picker = Picker()
-        #if not self.mouseWatcherNode.hasMouse():
+        # if not self.mouseWatcherNode.hasMouse():
         #    raise RuntimeError('No mouse')
 
     def userExit(self):
         vnc.stop()
 
-    def mouse_mode(self,relative):
+    def mouse_mode(self, relative):
         props = WindowProperties()
         props.setCursorHidden(relative)
-        #if relative:
+        # if relative:
         #    props.setMouseMode(WindowProperties.M_relative)
-        #else:
+        # else:
         #    props.setMouseMode(WindowProperties.M_absolute)
         self.win.requestProperties(props)
 
@@ -131,9 +132,9 @@ class Client(vnc.RFB):
         self.hover_caption = None
         self.rotating = None
         self.moving = None
-        self.lateral=True
-        self.hold_mouse = (0,0)
-        self.mouse_pos = (0,0)
+        self.lateral = True
+        self.hold_mouse = (0, 0)
+        self.mouse_pos = (0, 0)
         self.windows = {}
         self.wm = awm.Manager(self.get_display(), self)
         gui.accept('keydown', self.keydown)
@@ -143,16 +144,16 @@ class Client(vnc.RFB):
     def on_mouse_button(self, button, down):
         if self.hover > 0 and down:
             self.wm.focus(self.hover)
-        if button==1 or button==3:
+        if button == 1 or button == 3:
             if self.hover_caption and down:
                 self.moving = self.hover_caption
-                self.lateral=(button==1)
+                self.lateral = (button == 1)
                 self.hold_mouse = (self.mouse_pos[0], self.mouse_pos[1])
                 return
             if self.moving and not down:
                 self.moving = None
                 return
-        if button==2:
+        if button == 2:
             if self.hover_caption and down:
                 self.rotating = self.hover_caption
                 self.hold_mouse = (int(self.mouse_pos[0]), int(self.mouse_pos[1]))
@@ -213,13 +214,13 @@ class Client(vnc.RFB):
         mouse = gui.win.getPointer(0)
         x = mouse.getX()
         y = mouse.getY()
-        self.mouse_pos = (x,y)
+        self.mouse_pos = (x, y)
         if self.rotating:
-            self.rotating.rotate(x-self.hold_mouse[0],y-self.hold_mouse[1])
-            gui.win.movePointer(0,self.hold_mouse[0],self.hold_mouse[1])
+            self.rotating.rotate(x - self.hold_mouse[0], y - self.hold_mouse[1])
+            gui.win.movePointer(0, self.hold_mouse[0], self.hold_mouse[1])
         elif self.moving:
-            self.moving.move(x-self.hold_mouse[0],y-self.hold_mouse[1],self.lateral)
-            self.hold_mouse=(x,y)
+            self.moving.move(x - self.hold_mouse[0], y - self.hold_mouse[1], self.lateral)
+            self.hold_mouse = (x, y)
         else:
             self.hover_caption = None
             (w, v) = gui.doPicking()
