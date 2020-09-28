@@ -25,12 +25,20 @@ def calculate_display():
     return False
 
 
+def normalized_mouse_position(pos, ws):
+    x = pos[0] / float(ws[0])
+    y = 1.0 - pos[1] / float(ws[1])
+    return LPoint2(x * 2 - 1, y * 2 - 1)
+
+
+
 theta = 180
 phi = 0
 first_time_arrows = True
 cam_dist = 2200
 cam_offset = LVecBase3d(0, 0, 0)
 psi = 0
+
 
 def process_arrows(key):
     global theta
@@ -66,12 +74,12 @@ def process_arrows(key):
     pitch = LMatrix3d.rotateMat(phi, LVecBase3d(1, 0, 0))
     R = yaw * pitch
     p = R.cols[1]
-    p = LVecBase3d(d*p[0],d*p[1],d*p[2]) + cam_offset
+    p = LVecBase3d(d * p[0], d * p[1], d * p[2]) + cam_offset
     print(p)
     cam = globals.gui.camera
     cam.setPos(p[0], p[1], p[2])
     # cam.lookAt(Point3(0, 0, 0))
-    cam.setHpr(0,psi,0)
+    cam.setHpr(0, psi, 0)
     print(f'{cam.getPos()}   {cam.getHpr()}')
     return True
 
@@ -83,45 +91,30 @@ class Client(vnc.RFB):
         self.stride = 0
         self.hover = 0
         self.display = globals.display
+        self.dragged_window = None
         self.hover_caption = None
-        self.rotating = None
-        self.moving = None
-        self.lateral = True
         self.ignore_next_wheel_up = False
-        self.hold_mouse = (0, 0)
-        self.mouse_pos = (0, 0)
+        self.hold_mouse = 0, 0
+        self.mouse_pos = 0, 0
         self.windows = {}
         self.wm = awm.Manager(self.get_display(), self)
-        # self.pusher = CollisionHandlerPusher()
-        # globals.gui.desk.add_collider(globals.gui.cTrav, self.pusher)
         globals.gui.accept('keydown', self.key_down)
         globals.gui.accept('keyup', self.key_up)
         globals.gui.accept('keystroke', self.key_char)
         globals.gui.accept('keyrepeat', self.key_repeat)
-        #process_arrows('')
 
     def on_mouse_button(self, button, down):
         if self.hover > 0 and down:
             self.wm.focus(self.hover)
-        if button == 1 or button == 3:
-            if self.hover_caption and down:
-                self.moving = self.hover_caption
-                self.lateral = (button == 1)
+        if button == 1 and self.hover_caption and down:
+            if self.dragged_window:
+                self.dragged_window.set_physics(True)
+                self.dragged_window = None
+            else:
+                self.dragged_window = self.hover_caption
+                self.dragged_window.set_physics(False)
                 self.hold_mouse = (self.mouse_pos[0], self.mouse_pos[1])
-                return
-            if self.moving and not down:
-                self.moving = None
-                return
-        if button == 2:
-            if self.hover_caption and down:
-                self.rotating = self.hover_caption
-                self.hold_mouse = (int(self.mouse_pos[0]), int(self.mouse_pos[1]))
-                globals.gui.mouse_mode(True)
-                return
-            if self.rotating and not down:
-                self.rotating = None
-                globals.gui.mouse_mode(False)
-                return
+            return
         self.handle_mouse_button_event(button, down)
 
     def on_mouse_move(self, win, pos):
@@ -153,7 +146,7 @@ class Client(vnc.RFB):
                 self.handle_key_event((key, False))
 
     def key_char(self, key):
-        if len(key)==1 and ord(key) > 32:
+        if len(key) == 1 and ord(key) > 32:
             self.handle_key_event((key, True))
             self.handle_key_event((key, False))
 
@@ -186,7 +179,7 @@ class Client(vnc.RFB):
                     # gui.physicsMgr.attachPhysicalNode(w.box.node)
 
     def get_display(self):
-        return globals.display
+        return self.display
 
     def get_tasks(self):
         return [self.run_gui]
@@ -198,11 +191,11 @@ class Client(vnc.RFB):
         if self.mouse_pos[0] == x and self.mouse_pos[1] == y:
             return
         self.mouse_pos = x, y
-        if self.rotating:
-            self.rotating.rotate(x - self.hold_mouse[0], y - self.hold_mouse[1])
-            globals.gui.win.movePointer(0, int(self.hold_mouse[0]), int(self.hold_mouse[1]))
-        elif self.moving:
-            self.moving.move(x - self.hold_mouse[0], y - self.hold_mouse[1], self.lateral)
+        if self.dragged_window:
+            props = globals.gui.win.getProperties()
+            ws = props.size[0], props.size[1]
+            self.dragged_window.drag(normalized_mouse_position((x, y), ws),
+                                     normalized_mouse_position(self.hold_mouse, ws))
             self.hold_mouse = x, y
         else:
             self.hover_caption = None
