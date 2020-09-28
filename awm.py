@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-# import sys
-# import threading
-# import time
-# import socket
-# from select import select
 from Xlib.display import Display
 from Xlib import X
 from rectpack import newPacker
@@ -48,7 +43,7 @@ class Manager:
         if len(windows) > 0:
             for w in windows:
                 if w.get_attributes().map_state == 2:
-                    self.window_objects[w.window_id] = w
+                    self.window_objects[w.id] = w
                     g = w.get_geometry()
                     width = g.width
                     height = g.height
@@ -63,7 +58,7 @@ class Manager:
                 r = bag[i]
                 win = windows[i]
                 win.configure(x=r.x, y=r.y, width=r.width, height=r.height)
-                self.window_rectangles[win.window_id] = (r.x, r.y, r.width, r.height)
+                self.window_rectangles[win.id] = (r.x, r.y, r.width, r.height)
 
     def handle_events(self):
         n = self.display.pending_events()

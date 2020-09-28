@@ -109,7 +109,7 @@ class RFB(Protocol):
     def handle_server_name(self, block):
         self.server_name = str(block, 'utf-8')
         # Request 32bpp pixel format
-        self.transport.write(pack('!IBBBBHHHBBBBBB', 0, 32, 24, 1, 1, 255, 255, 255, 24, 16, 8, 0, 0, 0))
+        self.transport.write(pack('!IBBBBHHHBBBBBB', 0, 32, 24, 1, 1, 255, 255, 255, 8, 16, 24, 0, 0, 0))
         # SetEncodings to RAW and CopyRect only
         self.transport.write(pack('!BBHII', 2, 0, 2, 0, 1))
         self.request_update(True)
