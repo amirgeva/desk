@@ -5,7 +5,7 @@ import globals
 
 class Room:
     def __init__(self, base):
-        self.model = base.loader.load_model("room.egg", )
+        self.model = base.loader.load_model("models/room.egg", )
         self.model.reparentTo(base.render)
         s = 4000
 

@@ -15,7 +15,6 @@ class Window3D:
         print("Creating window ID={}".format(window_id))
         self.rect = rect
         self.window_id = window_id
-        self.sphere = globals.gui.loader.load_model('sphere20.egg', )
         self.box = WindowBox(globals.front_texture, globals.back_texture)
         self.box.update_vertices(rect, globals.desk_rect)
         y0 = 300
@@ -25,7 +24,7 @@ class Window3D:
         size = [0.5 * (a - b) for a, b in zip(self.box.mx, self.box.mn)]
         self.shape = BulletBoxShape(Vec3(size[0], size[1], size[2] + 10))
         self.phy_node = BulletRigidBodyNode('window')
-        volume = size[0]*size[1]*size[2]
+        volume = size[0] * size[1] * size[2]
         self.phy_node.setMass(0.001 * volume)
         self.phy_node.addShape(self.shape)
         self.node = globals.gui.render.attachNewNode(self.phy_node)
@@ -35,11 +34,9 @@ class Window3D:
         self.node.setCollideMask(BitMask32.bit(1))
         self.box.node.reparentTo(self.node)
         self.box.node.setPos(0, 0, size[2] - 10)
-        self.sphere_node = self.sphere.reparentTo(self.box.node)
         self.node.setPos(0, y0, z0)
-        # self.node.setHpr(0, 5, 0)
 
-    def getHookPos(self):
+    def get_hook_pos(self):
         return self.node.getPos() + self.box.node.getPos()
 
     def update_rectangle(self, rect):

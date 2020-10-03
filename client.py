@@ -257,7 +257,7 @@ class Client(vnc.RFB):
                         self.on_mouse_move(win, pos)
                     else:
                         self.hover_caption = win
-                        self.hover_caption_pos = win.getHookPos()
+                        self.hover_caption_pos = win.get_hook_pos()
 
     def run_gui(self):
         taskMgr.step()

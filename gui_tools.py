@@ -48,7 +48,7 @@ class GUIBase(ShowBase):
         self.setBackgroundColor(0.1, 0.5, 0.7)
         # self.enableParticles()
         # self.cTrav = CollisionTraverser()
-        globals.back_texture = loader.loadTexture('wood.jpg')
+        globals.back_texture = loader.loadTexture('models/sandstone2.jpg')
         self.buttonThrowers[0].node().setButtonDownEvent('keydown')
         self.buttonThrowers[0].node().setButtonUpEvent('keyup')
         self.buttonThrowers[0].node().setKeystrokeEvent('keystroke')
@@ -63,8 +63,8 @@ class GUIBase(ShowBase):
         self.win.requestProperties(props)
 
         self.lights = []
-        self.add_point_light((0.9, 0.9, 0.9, 1), (0, -1000, -1500))
-        self.add_point_light((0.9, 0.9, 0.9, 1), (0, 1000, 1800))
+        self.add_point_light((0.9, 0.9, 0.9, 1), (0, -1000, -1500), False)
+        self.add_point_light((0.9, 0.9, 0.9, 1), (0, 1000, 1800), True)
 
         self.camLens.setFov(70)
         self.camera.setPos(0, -2080, 200)
@@ -88,14 +88,14 @@ class GUIBase(ShowBase):
         self.desk = Desktop(self)
         self.debug_text = OnscreenText(text='', pos=(-1, 0.8), scale=0.05)
 
-    def add_point_light(self, color, position):
+    def add_point_light(self, color, position, shadows):
         index = len(self.lights)
         plight = PointLight(f'plight{index}')
         plight.setColor(color)
         plnp = render.attachNewNode(plight)
         plnp.setPos(position[0], position[1], position[2])
         plnp.node().setScene(render)
-        plnp.node().setShadowCaster(True)
+        plnp.node().setShadowCaster(shadows)
         self.lights.append((plight, plnp))
         render.setLight(plnp)
 
