@@ -1,4 +1,5 @@
 from direct.showbase.ShowBase import ShowBase
+from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import *
 # from panda3d.physics import *
 from panda3d.bullet import BulletWorld, BulletDebugNode
@@ -58,16 +59,18 @@ class GUIBase(ShowBase):
         props.setTitle('desk')
         # props.setFullscreen(True)
         # props.setUndecorated(True)
+        props.setSize(3800, 2000)
         self.win.requestProperties(props)
 
-        plight = PointLight('plight')
-        plight.setColor((0.9, 0.9, 0.9, 1))
-        self.plnp = render.attachNewNode(plight)
-        self.plnp.setPos(0, 0, 200)
-        render.setLight(self.plnp)
+        self.lights = []
+        self.add_point_light((0.9, 0.9, 0.9, 1), (0, -1000, -1500))
+        self.add_point_light((0.9, 0.9, 0.9, 1), (0, 1000, 1800))
 
-        self.camera.setPos(0,-2080,200)
+        self.camLens.setFov(70)
+        self.camera.setPos(0, -2080, 200)
         self.camera.setHpr(0, -8, 0)
+
+        render.setShaderAuto()
 
         # debugNode = BulletDebugNode('Debug')
         # debugNode.showWireframe(True)
@@ -78,11 +81,23 @@ class GUIBase(ShowBase):
         # debugNP.show()
 
         self.world = BulletWorld()
-        self.world.setGravity(Vec3(0, 0, -100))
+        self.world.setGravity(Vec3(0, 0, -1000))
         # self.world.setDebugNode(debugNP.node())
 
         self.last_time = None
         self.desk = Desktop(self)
+        self.debug_text = OnscreenText(text='', pos=(-1, 0.8), scale=0.05)
+
+    def add_point_light(self, color, position):
+        index = len(self.lights)
+        plight = PointLight(f'plight{index}')
+        plight.setColor(color)
+        plnp = render.attachNewNode(plight)
+        plnp.setPos(position[0], position[1], position[2])
+        plnp.node().setScene(render)
+        plnp.node().setShadowCaster(True)
+        self.lights.append((plight, plnp))
+        render.setLight(plnp)
 
     def loop(self):
         cur = time.time()
@@ -112,3 +127,6 @@ class GUIBase(ShowBase):
             mouse_position = self.mouseWatcherNode.getMouse()
             return self.picker.pick(mouse_position, self.camNode)
         return None, None
+
+    def set_debug_text(self, text):
+        self.debug_text.setText(text)

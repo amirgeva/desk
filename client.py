@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 # from math import copysign
 import sys
-import math
 import subprocess
 import vnc
 import awm
 import globals
-# from globals import gui
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import *
+from panda3d.bullet import BulletSphericalConstraint, BulletHingeConstraint
 from window3d import Window3D
 from gui_tools import GUIBase
+from hand import Hand
+from room import Room
+from computer import Computer
+
+
+def nose_pos_str(n):
+    p = n.getPos()
+    return f'{round(p[0])},{round(p[1])},{round(p[2])}'
 
 
 def calculate_display():
@@ -31,7 +38,7 @@ def normalized_mouse_position(pos, ws):
     return LPoint2(x * 2 - 1, y * 2 - 1)
 
 
-
+alpha = 0
 theta = 180
 phi = 0
 first_time_arrows = True
@@ -41,6 +48,7 @@ psi = 0
 
 
 def process_arrows(key):
+    global alpha
     global theta
     global phi
     global first_time_arrows
@@ -62,6 +70,10 @@ def process_arrows(key):
         psi += 1
     elif key == 'control-page_up':
         psi -= 1
+    elif key == 'control-arrow_left':
+        alpha -= 1
+    elif key == 'control-arrow_right':
+        alpha += 1
     elif key == 'control-arrow_up':
         cam_offset[2] += 100
     elif key == 'control-arrow_down':
@@ -93,11 +105,16 @@ class Client(vnc.RFB):
         self.display = globals.display
         self.dragged_window = None
         self.hover_caption = None
+        self.hover_caption_pos = None
         self.ignore_next_wheel_up = False
         self.hold_mouse = 0, 0
         self.mouse_pos = 0, 0
         self.windows = {}
         self.wm = awm.Manager(self.get_display(), self)
+        self.hand = Hand(globals.gui)
+        self.hand_constraint = None
+        self.room = Room(globals.gui)
+        # self.computer = Computer(globals.gui)
         globals.gui.accept('keydown', self.key_down)
         globals.gui.accept('keyup', self.key_up)
         globals.gui.accept('keystroke', self.key_char)
@@ -108,11 +125,22 @@ class Client(vnc.RFB):
             self.wm.focus(self.hover)
         if button == 1 and self.hover_caption and down:
             if self.dragged_window:
-                self.dragged_window.set_physics(True)
+                # self.dragged_window.set_physics(True)
                 self.dragged_window = None
+                globals.gui.world.remove(self.hand_constraint)
+                self.hand.node.setPos(5000, 0, 0)
             else:
                 self.dragged_window = self.hover_caption
-                self.dragged_window.set_physics(False)
+                offset = LVector3(0, 0, 50)
+                self.hand.node.setPos(self.hover_caption_pos + offset)
+                self.hand_constraint = BulletHingeConstraint(self.hand.phy_node, self.dragged_window.phy_node,
+                                                             Point3(0, 0, 0),
+                                                             self.dragged_window.box.node.getPos() + offset,
+                                                             LVector3(1, 0, 0), LVector3(1, 0, 0), False)
+                # self.hand_constraint = BulletSphericalConstraint(self.hand.phy_node, self.dragged_window.phy_node,
+                #                                                  Point3(0, 0, 0), self.dragged_window.box.node.getPos())
+                globals.gui.world.attachConstraint(self.hand_constraint)
+                # self.dragged_window.set_physics(False)
                 self.hold_mouse = (self.mouse_pos[0], self.mouse_pos[1])
             return
         self.handle_mouse_button_event(button, down)
@@ -120,14 +148,24 @@ class Client(vnc.RFB):
     def on_mouse_move(self, win, pos):
         self.handle_mouse_move_event(pos)
 
+    def handle_drag_wheel(self, direction):
+        p = self.hand.node.getPos()
+        if direction == 'down':
+            p[1] -= 100
+        else:
+            p[1] += 100
+        self.hand.node.setPos(p)
+
     def key_down(self, key):
         if len(key) > 1:
             print(f'Key: "{key}"')
             # if process_arrows(key):
             #     return
+            if key.startswith('wheel') and self.dragged_window:
+                self.handle_drag_wheel(key[6:])
             if key == 'alt-escape':
-                pass
-                # gui.close_window()
+                globals.gui.closeWindow(globals.gui.win)
+                globals.gui.userExit()
             if key.startswith('mouse'):
                 self.on_mouse_button(int(key[5:]), True)
             elif key.startswith('control-wheel'):
@@ -171,12 +209,12 @@ class Client(vnc.RFB):
         self.remove_old_windows(wins)
         if globals.front_texture:
             for window_id in wins.keys():
+                r = wins.get(window_id)
                 if window_id not in self.windows:
-                    w = Window3D(window_id, wins.get(window_id))
+                    w = Window3D(window_id, r)
                     self.windows[window_id] = w
-                    # print("Adding window collider")
-                    # w.add_collider(globals.gui.cTrav, self.pusher)
-                    # gui.physicsMgr.attachPhysicalNode(w.box.node)
+                else:
+                    self.windows.get(window_id).update_rectangle(r)
 
     def get_display(self):
         return self.display
@@ -185,6 +223,13 @@ class Client(vnc.RFB):
         return [self.run_gui]
 
     def poll_mouse(self):
+        if not globals.gui.win:
+            return
+        if self.windows:
+            window_ids = list(self.windows.keys())
+            w = self.windows.get(window_ids[0])
+            s = nose_pos_str(w.node) + '   ' + nose_pos_str(self.hand.node)
+            globals.gui.set_debug_text(s)
         mouse = globals.gui.win.getPointer(0)
         x = mouse.getX()
         y = mouse.getY()
@@ -192,10 +237,13 @@ class Client(vnc.RFB):
             return
         self.mouse_pos = x, y
         if self.dragged_window:
-            props = globals.gui.win.getProperties()
-            ws = props.size[0], props.size[1]
-            self.dragged_window.drag(normalized_mouse_position((x, y), ws),
-                                     normalized_mouse_position(self.hold_mouse, ws))
+            # props = globals.gui.win.getProperties()
+            # ws = props.size[0], props.size[1]
+            # self.dragged_window.drag(normalized_mouse_position((x, y), ws),
+            #                          normalized_mouse_position(self.hold_mouse, ws))
+            delta = x - self.hold_mouse[0], 0, -(y - self.hold_mouse[1])
+            self.dragged_window.move(delta)
+            self.hand.move(delta)
             self.hold_mouse = x, y
         else:
             self.hover_caption = None
@@ -209,6 +257,7 @@ class Client(vnc.RFB):
                         self.on_mouse_move(win, pos)
                     else:
                         self.hover_caption = win
+                        self.hover_caption_pos = win.getHookPos()
 
     def run_gui(self):
         taskMgr.step()

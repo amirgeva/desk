@@ -4,7 +4,7 @@ from panda3d.bullet import BulletBoxShape, BulletRigidBodyNode
 
 class Desktop:
     def __init__(self, base):
-        self.model = base.loader.load_model("desk3.egg", )
+        self.model = base.loader.load_model("models/desk3.egg", )
         # self.model.setPos(0, 2000, -1500)
         # self.model.reparent_to(base.render)
 
@@ -15,13 +15,14 @@ class Desktop:
 
         # Physics and collisions
         self.shape = BulletBoxShape(Vec3(925, 435, 385))
-        self.physics_node = BulletRigidBodyNode('desk')
-        self.physics_node.addShape(self.shape)
-        o = base.render.attachNewNode(self.physics_node)
-        self.model.reparentTo(o)
-        self.model.setPos(0,0,-385)
-        base.world.attachRigidBody(self.physics_node)
-        o.setPos(0,0,-770)
+        self.phy_node = BulletRigidBodyNode('desk')
+        self.phy_node.addShape(self.shape)
+        self.node = base.render.attachNewNode(self.phy_node)
+        self.model.reparentTo(self.node)
+        self.model.setPos(0, 0, -385)
+        base.world.attachRigidBody(self.phy_node)
+        self.node.setPos(0, 0, -770)
+        self.node.setCollideMask(BitMask32.bit(1))
 
     def loop(self):
         self.model.setPos(0, 2000, -1500)

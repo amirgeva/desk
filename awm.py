@@ -23,7 +23,7 @@ class Manager:
             for w in windows:
                 if w.get_attributes().map_state == 2:
                     g = w.get_geometry()
-                    print(f'Window {w.id}: {g.width}x{g.height}')
+                    print(f'Window {w.id}: {g.width}x{g.height} @ {g.x},{g.y}')
                     self.window_rectangles[w.id] = (g.x, g.y, g.width, g.height)
                     self.window_objects[w.id] = w
             print('------------------------')
