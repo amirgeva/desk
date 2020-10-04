@@ -17,8 +17,10 @@ class Window3D:
         self.window_id = window_id
         self.box = WindowBox(globals.front_texture, globals.back_texture)
         self.box.update_vertices(rect, globals.desk_rect)
-        y0 = 300
-        z0 = 100
+        x0 = int(rect[0]*1.1) - 2000 + int(0.7 * rect[2])
+        y0 = 1980
+        z0 = int(rect[1]*1.1) - 500
+        self.default_position = Point3(x0,y0,z0)
         self.box.node.setTag('wid', str(window_id))
 
         size = [0.5 * (a - b) for a, b in zip(self.box.mx, self.box.mn)]
@@ -34,7 +36,13 @@ class Window3D:
         self.node.setCollideMask(BitMask32.bit(1))
         self.box.node.reparentTo(self.node)
         self.box.node.setPos(0, 0, size[2] - 10)
-        self.node.setPos(0, y0, z0)
+        self.node.setPos(x0, y0, z0)
+        self.set_physics(False)
+
+    def reset_position(self):
+        self.node.setPos(self.default_position)
+        self.node.setHpr(0,0,0)
+        self.set_physics(False)
 
     def get_hook_pos(self):
         return self.node.getPos() + self.box.node.getPos()
@@ -50,28 +58,6 @@ class Window3D:
             self.phy_node.setMass(0.0)
             self.phy_node.setLinearVelocity(LVector3(0, 0, 0))
             self.phy_node.setAngularVelocity(LVector3(0, 0, 0))
-
-    def drag(self, mouse_pos, old_mouse_pos):
-        v = self.node.getPos()
-        cam_node = globals.gui.camNode
-        cam = globals.gui.camera
-        Rcw = cam.getMat()
-        Rwc = LMatrix4f(cam.getMat())
-        Rwc.invertInPlace()
-        vrel = Rwc.xformPoint(v)
-        y = vrel[1]
-        ray = CollisionRay()
-        ray.setFromLens(cam_node, old_mouse_pos)
-        direction = ray.getDirection()
-        old_pos = direction * (y / direction[1])
-        ray.setFromLens(cam_node, mouse_pos)
-        direction = ray.getDirection()
-        new_pos = direction * (y / direction[1])
-        delta = new_pos - old_pos
-        pos = vrel + delta
-        pos = Rcw.xformPoint(pos)
-        self.node.setPos(pos)
-        return True
 
     def rotate(self, dx, dy):
         dx = norm_rot(dx)

@@ -68,7 +68,7 @@ class GUIBase(ShowBase):
 
         self.camLens.setFov(70)
         self.camera.setPos(0, -2080, 200)
-        self.camera.setHpr(0, -8, 0)
+        self.camera.setHpr(0, 0, 0)  # -8
 
         render.setShaderAuto()
 
@@ -116,10 +116,10 @@ class GUIBase(ShowBase):
         props = WindowProperties()
         props.setCursorHidden(relative)
         # props.setUndecorated(True)
-        # if relative:
-        #    props.setMouseMode(WindowProperties.M_relative)
-        # else:
-        #    props.setMouseMode(WindowProperties.M_absolute)
+        if relative:
+            props.setMouseMode(WindowProperties.M_relative)
+        else:
+            props.setMouseMode(WindowProperties.M_absolute)
         self.win.requestProperties(props)
 
     def do_picking(self):
