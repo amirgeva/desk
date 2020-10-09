@@ -7,15 +7,15 @@ from rectpack import newPacker
 
 class Manager:
     def __init__(self, display, client):
-        self.logfile = open('awm.log', 'w')
-        self.logfile.write('-------------------------\n')
+        self.logfile = None # open('awm.log', 'w')
+        self.log('-------------------------')
         self.display = Display(':{}'.format(display))
         self.root = self.display.screen().root
         self.root.change_attributes(event_mask=X.SubstructureNotifyMask)
         self.window_rectangles = {}
         self.window_objects = {}
         self.client = client
-        self.refresh()
+        self.arrange()
 
     def refresh(self):
         self.window_rectangles = {}
@@ -26,7 +26,7 @@ class Manager:
             for w in windows:
                 if w.get_attributes().map_state == 2:
                     g = w.get_geometry()
-                    self.log(f'Window {w.id}: {g.width}x{g.height} @ {g.x},{g.y}')
+                    self.log(f'Window {w.id:x}: {g.width}x{g.height} @ {g.x},{g.y}')
                     self.window_rectangles[w.id] = (g.x, g.y, g.width, g.height)
                     self.window_objects[w.id] = w
             self.client.update_windows(self.window_rectangles)
@@ -42,32 +42,37 @@ class Manager:
         windows = self.root.query_tree().children
         self.window_rectangles = {}
         self.window_objects = {}
+        mapped_windows = []
         if len(windows) > 0:
-            i = 0
-            while i < len(windows):
-                w = windows[i]
+            for w in windows:
                 try:
-                    self.log(f'windows[{i}] id={w.id}  map_state = {w.get_attributes().map_state}')
+                    self.log(f'window id={w.id:x}  map_state = {w.get_attributes().map_state}')
                     if w.get_attributes().map_state == 2:
                         self.window_objects[w.id] = w
+                        mapped_windows.append(w)
                         g = w.get_geometry()
                         width = g.width
                         height = g.height
-                        self.log("Adding window size: {}x{}".format(width, height))
-                        packer.add_rect(g.width, g.height)
-                    i = i + 1
+                        self.log(f"Adding window size: {width}x{height}")
+                        packer.add_rect(g.width, g.height, w.id)
+                    # else:
+                    #     raise Exception()
                 except BadWindow:
-                    del windows[i]
+                    pass
+                except Exception as e:
+                    print(e)
             g = self.root.get_geometry()
+            self.log(f'Packing into root size {g.width}x{g.height}')
             packer.add_bin(g.width, g.height)
             packer.pack()
-            bag = packer[0]
-            n = len(bag)
-            for i in range(n):
-                r = bag[i]
-                win = windows[i]
-                win.configure(x=r.x, y=r.y, width=r.width, height=r.height)
-                self.window_rectangles[win.id] = (r.x, r.y, r.width, r.height)
+            rects = packer.rect_list()
+            for _, x, y, w, h, wid in rects:
+                if wid in self.window_objects:
+                    win = self.window_objects.get(wid)
+                    win.configure(x=x, y=y, width=w, height=h)
+                    self.window_rectangles[wid] = (x, y, w, h)
+            else:
+                self.log('Packer has no bins')
 
     def handle_events(self):
         n = self.display.pending_events()

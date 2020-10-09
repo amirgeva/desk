@@ -115,6 +115,7 @@ class Client(vnc.RFB):
         self.reset_mouse = False
         self.windows = {}
         self.sphere = None
+        self.first_frame_update = True
         # self.sphere = globals.gui.loader.load_model('models/sphere20.egg', )
         # self.sphere.reparentTo(globals.gui.render)
         # self.sphere.setPos(0, 2000, 0)
@@ -364,13 +365,11 @@ class Client(vnc.RFB):
     def update_pixels(self, rect, pixels):
         pixels = bytes(pixels)
         if not globals.front_texture:
-            globals.desk_rect = (rect[2], rect[3])
-            sys.stdout.write("Loading front texture: ")
+            globals.desk_rect = self.width, self.height
             globals.front_texture = Texture("screen")
-            globals.front_texture.setup2dTexture(rect[2], rect[3], Texture.TUnsignedByte, Texture.FRgba8)
+            globals.front_texture.setup2dTexture(self.width, self.height, Texture.TUnsignedByte, Texture.FRgba8)
             print(globals.front_texture)
-            self.stride = rect[2] * 4
-            self.wm.refresh()
+            self.stride = self.width * 4
         buffer = globals.front_texture.modifyRamImage()
         src_stride = rect[2] * 4
         src = 0
@@ -380,13 +379,19 @@ class Client(vnc.RFB):
             index += self.stride
             src += src_stride
 
+    def rects_done(self):
+        if self.first_frame_update:
+            self.first_frame_update = False
+            self.wm.refresh()
+
 
 def main():
     if not calculate_display():
-        print("VNC not started.  Run:\nXvnc -geometry 3840x2160 -depth 24 :15 &")
+        print("VNC not started.  Run:\nXvnc -geometry 3840x2160 -depth 24 -Protocol3.3 -SecurityTypes None :15 &")
         print("xterm -fn 10x20 -fg green -bg black -display :15 &")
     else:
-        vnc.run(Client())
+        c = Client()
+        vnc.run(c)
 
 
 if __name__ == '__main__':

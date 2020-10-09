@@ -43,6 +43,7 @@ class RFB(Protocol):
             'rshift': 0xffe2,
             'lcontrol': 0xffe3,
             'rcontrol': 0xffe4,
+            'meta': 0xffe7,
             'lalt': 0xffe9,
             'ralt': 0xffea,
             'space': 0x0020
@@ -158,7 +159,6 @@ class RFB(Protocol):
 
     def handle(self):
         if self.rectangles_left > 0:
-            self.rectangles_left = self.rectangles_left - 1
             self.expect(self.handle_rectangle, 12)
         elif self.buffer[0] == 0:
             self.expect(self.frame_buffer_update, 4)
@@ -190,23 +190,25 @@ class RFB(Protocol):
     def frame_buffer_update(self, block):
         header, n = unpack('!HH', block)
         # print("BUFFER_UPDATE ({})".format(n))
-        self.rectangles_left = n - 1
+        self.rectangles_left = n
         self.expect(self.handle_rectangle, 12)
 
     def handle_rectangle(self, block):
         x, y, w, h, e = unpack('!HHHHI', block)
+        self.rectangles_left = self.rectangles_left - 1
         # print("Handle {},{},{},{}".format(x, y, w, h))
         self.cur_rect = (x, y, w, h)
         if e == 0:
             self.expect(self.handle_raw, w * h * 4)
         elif e == 1:
             self.expect(self.handle_copy_rect, 4)
-        if self.rectangles_left == 0:
-            self.request_update(False)
 
     def handle_raw(self, block):
         # print("Received block size: {}, for rect: {},{},{},{}".format(len(block), *self.cur_rect))
         self.update_pixels(self.cur_rect, block)
+        if self.rectangles_left == 0:
+            self.request_update(False)
+            self.rects_done()
         # if self.rectangles_left > 0:
         #    self.handle()
 
@@ -214,6 +216,9 @@ class RFB(Protocol):
         srcx, srcy = unpack('!HH', block)
         # print("Received copy from {},{}   to  rect: {},{},{},{}".format(srcx, srcy, *self.cur_rect))
         self.copy_rect((srcx, srcy), self.cur_rect)
+        if self.rectangles_left == 0:
+            self.request_update(False)
+            self.rects_done()
         # if self.rectangles_left > 0:
         #    self.handle()
 
@@ -223,6 +228,8 @@ class RFB(Protocol):
     def update_pixels(self, rect, pixels):
         pass
 
+    def rects_done(self):
+        pass
 
 def run(client):
     d = client.get_display()
