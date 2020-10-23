@@ -7,7 +7,7 @@ from rectpack import newPacker
 
 class Manager:
     def __init__(self, display, client):
-        self.logfile = None # open('awm.log', 'w')
+        self.logfile = open('awm.log', 'w')
         self.log('-------------------------')
         self.display = Display(':{}'.format(display))
         self.root = self.display.screen().root
@@ -29,6 +29,7 @@ class Manager:
                     self.log(f'Window {w.id:x}: {g.width}x{g.height} @ {g.x},{g.y}')
                     self.window_rectangles[w.id] = (g.x, g.y, g.width, g.height)
                     self.window_objects[w.id] = w
+                    w.change_attributes(event_mask=X.EnterWindowMask)
             self.client.update_windows(self.window_rectangles)
 
     def focus(self, window_id):
@@ -36,6 +37,8 @@ class Manager:
             self.log("Raising {}".format(window_id))
             w = self.window_objects.get(window_id)
             w.circulate(X.RaiseLowest)
+            #self.display.set_input_focus(w, X.RevertToParent, )
+            w.set_input_focus(X.RevertToParent, X.CurrentTime)
 
     def arrange(self):
         packer = newPacker(rotation=False)
@@ -84,6 +87,8 @@ class Manager:
                 self.client.hold()
                 self.arrange()
                 self.client.update_windows(self.window_rectangles)
+            if event.type == X.EnterNotify:
+                self.focus(event.window.id)
 
     def log(self, s):
         if self.logfile:
